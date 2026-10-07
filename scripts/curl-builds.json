@@ -1,0 +1,12 @@
+{
+  "version": "8.22.0_3",
+  "source": "https://curl.se/windows/",
+  "x64": {
+    "archive": "curl-8.22.0_3-win64-mingw.zip",
+    "sha256": "f38b0ac2e3a280fd414b607c874a21e6dd4d1ed0e2ae622afbf0020917446561"
+  },
+  "arm64": {
+    "archive": "curl-8.22.0_3-win64a-mingw.zip",
+    "sha256": "a5e241ab0d48faabf5fa650884d8fa058b10aa6491f7b083874699602ba90ed3"
+  }
+}

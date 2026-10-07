@@ -1,75 +1,68 @@
-# dsh-plugin-net-access
+# Net Access for current DSH
 
-[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/Gumiho12345/dsh-plugin-net-access?style=social&label=Star)](https://github.com/Gumiho12345/dsh-plugin-net-access/stargazers)
-[![Awesome DSH Plugin](https://beancookie.github.io/awesome-dsh-plugin/badge.svg)](https://beancookie.github.io/awesome-dsh-plugin)
-[![npm version](https://img.shields.io/npm/v/dsh-plugin-net-access.svg)](https://www.npmjs.com/package/dsh-plugin-net-access)
+English | [简体中文](README.md)
 
-[简体中文](README.md) | English
-
-A permission-mode patch for DSH: adds a **Net Access** mode that keeps the workspace-write file protection while restoring HTTPS inside the sandbox.
-
-DSH's Windows sandbox (workspace-write) blocks Schannel-based HTTPS requests (error `0x8009030E`), so the built-in curl and Invoke-WebRequest don't work inside it. Net Access keeps the exact same file-write protection as workspace-write and makes HTTPS work again in the sandbox. Windows only; not pinned to a DSH version — the patches adapt by structural anchors.
-
-## What it does
-
-- `curl.exe` works with HTTPS inside the sandbox
-- File-write protection identical to workspace-write: writes outside the workspace are denied
-- A new **Net Access** option in the permission selector
-- python / node HTTPS is unaffected
-
-## How it works
-
-The sandbox token stays exactly the same as workspace-write; the runner just prepends an OpenSSL-based curl to PATH so HTTPS no longer goes through the blocked Schannel. Full technical write-up: [docs/findings-zh.md](docs/findings-zh.md).
+A compatibility fork of [Gumiho12345/dsh-plugin-net-access](https://github.com/Gumiho12345/dsh-plugin-net-access). Version 0.4.0 replaces engine patching with a public DSH subprocess provider. Tested on Windows x64 / Node 24 with DSH **0.2.0-rc.2** (npm latest) and **0.2.1-alpha.1** (alpha), checked 2026-10-07. See [validation details](docs/compatibility.md).
 
 ## Install
 
-Option 1: via npm
+Requires Windows 10/11, Node 22+, npm, pnpm, and Windows tar.exe. Use Node 24.5+ when downloading through HTTP(S) proxy environment variables. Stop the target DSH profile first.
 
 ```powershell
-npx @deepseek-ai/dsh plugin --profile web add dsh-plugin-net-access
-. "$env:USERPROFILE\.dsh\profiles\web\node_modules\dsh-plugin-net-access\setup.ps1"
+git clone https://github.com/ctfyui/dsh-plugin-net-access.git
+cd dsh-plugin-net-access
+node scripts/setup.mjs
+npx @deepseek-ai/dsh plugin --profile web add .
+npx @deepseek-ai/dsh --profile web --no-open
 ```
 
-Option 2: download from GitHub and run
+Replace `web` with your profile name. This fork uses `@ctfyui/dsh-plugin-net-access`, which is not published to npm; install from the local directory. The PowerShell setup.ps1 wrapper invokes the same Node installer. The Node entry does not depend on PowerShell script execution policy.
+
+Setup downloads the pinned official curl 8.22.0_3 build, verifies its recorded SHA-256 **before extraction/execution**, validates LibreSSL/OpenSSL and the PEM CA bundle, and checks HTTPS. It reuses a valid existing toolbox and refuses to overwrite an incomplete directory. It never patches the engine, overwrites profile YAML, or changes system PATH or Git settings.
+
+The default is `$DSH_HOME/netaccess-tools/bin`, falling back to `~/.dsh/netaccess-tools/bin`. For a custom directory, set `DSH_NETACCESS_TOOLBIN` before both setup and DSH launch, and run `node scripts/setup.mjs --tool-bin $env:DSH_NETACCESS_TOOLBIN`. Alternatively configure `toolBin` on the `net-access-subprocess` profile row. A custom toolbox needs curl.exe with OpenSSL/LibreSSL plus curl-ca-bundle.crt, cacert.pem, or ca-bundle.crt. `--skip-download --skip-https-check` permits offline validation, without claiming a network check.
+
+## Behavior
+
+- **Net Access** is a preset for native `workspace-write + ask`. No new sandbox mode is persisted and no session permission is automatically changed.
+- The toolbox applies to local subprocesses across **all presets**, including ordinary commands, background jobs and newly created persistent terminals. The preset selector is not a network toggle.
+- Only per-child PATH and default CURL_CA_BUNDLE are added. The official DSH implementation retains credential scrubbing, sandbox argv, restricted tokens, approval policy, process ownership and cancellation. Existing corporate CA settings take precedence; the host environment is unchanged.
+- Intended for local Windows profiles. Do not combine it with a remote/SSH provider replacing the same subprocess service. The Windows implementation is disabled on other platforms.
+- Native Windows ACL enforcement remains DSH's `partial` enforcement, with its original limitations. Schannel Invoke-WebRequest and explicitly selected system curl are not repaired. Git TLS configuration is unchanged.
+- Restart DSH and recreate persistent terminals after changes.
+
+The bundle supplies the three stock presets plus Net Access. DSH user overrides win and are never overwritten. If your user layer already defines `permission`, add `net-access: { sandbox: workspace-write, approval: ask, name: Net Access }` to its table yourself.
+
+## Validate
+
+Inside DSH with workspace-write or Net Access selected:
 
 ```powershell
-.\setup.ps1
+(Get-Command curl.exe).Source
+curl.exe --disable --fail --silent --show-error https://example.com
 ```
 
-`setup.ps1` does three things: patches the engine by structural anchors (not pinned to a DSH version), registers the permission preset, and downloads the OpenSSL curl toolbox from curl.se into `%USERPROFILE%\.dsh\netaccess-tools\bin\`.
-
-**A full DSH restart is required for the plugin to load**: stop the 3080 listener (Ctrl+C in its terminal, or `netstat -ano | findstr 3080` + `taskkill /F /PID <pid>`), then run `npx @deepseek-ai/dsh web` again. Refreshing the browser alone will not load the new plugin. After the restart, refresh the page and pick **Net Access** in the permission selector (bottom-left).
-
-**After a DSH upgrade**: just re-run `setup.ps1` — no need to wait for a plugin update, because the patches adapt by structural anchors instead of a version pin. If a future DSH restructure moves an anchor, the installer aborts with a clear error (nothing gets corrupted); update the plugin then.
-
-## Verify
+Repository development:
 
 ```powershell
-curl.exe -sS https://example.com
-# HTTP 200
-
-Set-Content "$env:USERPROFILE\Desktop\t.txt" x
-# access denied
+pnpm install
+node scripts/setup.mjs --tool-bin "$PWD\.validation\toolbox\bin"
+pnpm test
+pnpm test:integration
 ```
 
-## Known limitations
+Integration tests create disposable user-temp workspaces, check HTTPS/TLS, allowed workspace writes, denied sibling and read-only writes, and real terminal PATH. They dispose Cordis services before the test runner's `--test-force-exit` terminates residual upstream native/worker handles. `SetNamedSecurityInfoW failed (Win32 5)` means DSH cannot set the workspace ACL/integrity label; use a workspace under your user's full control.
 
-- The built-in curl and `Invoke-WebRequest` cannot use HTTPS: use the bundled `curl.exe`, python or node.
-- git over HTTPS needs `git config --global http.sslBackend openssl` first.
-- `C:\Users\Public` stays writable (same as workspace-write).
-- WMI is unavailable (same as workspace-write).
+## Upgrade from 0.3.0 / uninstall
 
-## Uninstall
+Stop DSH, remove the old bundle, and install a clean target DSH release. Never restore old `.netaccess.bak` files over a newer engine. Back up and inspect user profile settings, replacing legacy `sandbox: net-access` values. Archive old sessions containing that unsupported mode and create new sessions.
+
+Historical patches/, manifest.json, tools/build-recipes.py, extras/ and docs/findings-zh.md are retained as upstream research only and excluded from the 0.4.0 package. install.ps1 now delegates to toolbox setup.
 
 ```powershell
-.\uninstall.ps1
+npx @deepseek-ai/dsh plugin --profile web remove @ctfyui/dsh-plugin-net-access
 ```
 
-## License
+Restart to restore the official provider. Toolbox files and historical backups are retained; uninstall.ps1 displays these instructions.
 
-MIT. Files under `patches/` come from the `@deepseek-ai/dsh-*` packages (MIT, Copyright (c) 2026 DeepSeek); keep their copyright notice when redistributing.
-
----
-
-If you find this useful, a ⭐ Star would be appreciated.
+MIT; upstream attribution is preserved. Downloaded curl retains its own COPYING.txt.

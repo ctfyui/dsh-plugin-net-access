@@ -1,5 +1,7 @@
-# npm pack / publish artifacts
+node_modules/
+.upstream-dsh/
+.tools/
+.validation/
+dist/
 *.tgz
-
-tools/__pycache__/
-*.pyc
+*.netaccess.bak

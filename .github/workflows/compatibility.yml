@@ -1,0 +1,35 @@
+name: Windows DSH compatibility
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dsh: ['0.2.0-rc.2', '0.2.1-alpha.1']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.19.0'
+      - name: Select DSH version
+        env:
+          DSH_TEST_VERSION: ${{ matrix.dsh }}
+        run: node scripts/select-test-version.mjs
+      - run: pnpm install --no-frozen-lockfile
+      - run: node scripts/setup.mjs --tool-bin "${{ github.workspace }}\.validation\toolbox\bin"
+      - run: pnpm test
+      - run: pnpm test:integration
+      - run: pnpm pack --out dist/plugin.tgz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugin-dsh-${{ matrix.dsh }}
+          path: dist/plugin.tgz

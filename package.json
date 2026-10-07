@@ -1,6 +1,12 @@
 {
-  "name": "dsh-plugin-net-access",
-  "version": "0.3.0",
+  "name": "@ctfyui/dsh-plugin-net-access",
+  "version": "0.4.0",
+  "type": "module",
+  "main": "plugin/index.js",
+  "exports": { ".": "./plugin/index.js", "./package.json": "./package.json" },
+  "repository": { "type": "git", "url": "https://github.com/ctfyui/dsh-plugin-net-access.git" },
+  "engines": { "node": ">=22" },
+  "scripts": { "test": "node --test test/*.test.js", "test:integration": "node --test --test-force-exit test/integration/*.test.js", "setup": "node scripts/setup.mjs" },
   "description": "Net Access permission preset for DeepSeek Harness (Windows): HTTPS works inside the sandbox while file writes stay confined like workspace-write.",
   "license": "MIT",
   "private": false,
@@ -15,9 +21,8 @@
   ],
   "files": [
     "plugin/",
-    "patches/",
-    "docs/",
-    "manifest.json",
+    "scripts/",
+    "docs/compatibility.md",
     "install.ps1",
     "setup.ps1",
     "uninstall.ps1",
@@ -26,7 +31,21 @@
     "README.en.md"
   ],
   "peerDependencies": {
-    "@deepseek-ai/dsh": "0.1.0-rc.7"
+    "@deepseek-ai/dsh": "0.2.0-rc.2 || 0.2.1-alpha.1",
+    "@deepseek-ai/dsh-subprocess-local": "0.2.0-rc.2 || 0.2.1-alpha.1",
+    "@deepseek-ai/schemastery": "~3.18.4"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-subprocess-local": "0.2.0-rc.2",
+    "@deepseek-ai/schemastery": "~3.18.4",
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/cordis-plugin-include": "~1.0.9",
+    "@deepseek-ai/dsh-sandbox-local": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-sandbox-policy": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-pwsh-sandbox": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-session-projection": "0.2.0-rc.2",
+    "js-yaml": "^4.2.0"
   },
   "dsh": {
     "bundle": {
